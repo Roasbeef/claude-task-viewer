@@ -1,0 +1,339 @@
+{{define "tasks.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} | Claude Task Viewer</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/htmx.min.js"></script>
+</head>
+<body class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <a href="/" class="sidebar-brand">
+                <span class="brand-icon"></span>
+                <span class="brand-text">Mission Control</span>
+            </a>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <a href="/" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0L0 6v10h6V9h4v7h6V6L8 0z"/>
+                    </svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/lists/{{.ListID}}" class="nav-item active">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M2 2h12v2H2V2zm0 4h12v2H2V6zm0 4h8v2H2v-2z"/>
+                    </svg>
+                    <span>Kanban Board</span>
+                    <span class="nav-badge">{{.TotalCount}}</span>
+                </a>
+                <a href="/lists/{{.ListID}}/graph" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M4 3a2 2 0 100 4 2 2 0 000-4zm8 2a2 2 0 100 4 2 2 0 000-4zm-4 6a2 2 0 100 4 2 2 0 000-4z"/>
+                    </svg>
+                    <span>Dependency Graph</span>
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Board Stats</div>
+                <div class="nav-stats">
+                    <div class="nav-stat">
+                        <span class="stat-dot pending"></span>
+                        <span class="stat-label">Pending</span>
+                        <span class="stat-value">{{.PendingCount}}</span>
+                    </div>
+                    <div class="nav-stat">
+                        <span class="stat-dot progress"></span>
+                        <span class="stat-label">In Progress</span>
+                        <span class="stat-value">{{.InProgressCount}}</span>
+                    </div>
+                    <div class="nav-stat">
+                        <span class="stat-dot completed"></span>
+                        <span class="stat-label">Completed</span>
+                        <span class="stat-value">{{.CompletedCount}}</span>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="keyboard-hints">
+                <div class="hint"><kbd>←→</kbd> Columns</div>
+                <div class="hint"><kbd>↑↓</kbd> Tasks</div>
+                <div class="hint"><kbd>↵</kbd> View</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content kanban-view">
+        <header class="topbar">
+            <div class="topbar-left">
+                <a href="/" class="back-btn" title="Back to dashboard">
+                    <svg viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M10 3L5 8l5 5V3z"/>
+                    </svg>
+                </a>
+                <h1 class="page-title">Task Board</h1>
+                <span class="session-badge mono">{{truncateID .ListID 12}}</span>
+            </div>
+            <div class="topbar-right">
+                <a href="/lists/{{.ListID}}/graph" class="btn btn-secondary btn-sm">
+                    <svg viewBox="0 0 16 16" fill="currentColor" style="width:14px;height:14px">
+                        <path d="M4 3a2 2 0 100 4 2 2 0 000-4zm8 2a2 2 0 100 4 2 2 0 000-4zm-4 6a2 2 0 100 4 2 2 0 000-4z"/>
+                    </svg>
+                    Graph
+                </a>
+            </div>
+        </header>
+
+        <!-- Kanban Board -->
+        <div class="kanban-board"
+             hx-ext="sse"
+             sse-connect="/api/lists/{{.ListID}}/events"
+             sse-swap="task-updated">
+
+            <!-- Pending Column -->
+            <div class="kanban-column" data-status="pending">
+                <div class="kanban-column-header">
+                    <div class="column-title">
+                        <span class="column-indicator pending"></span>
+                        <span class="column-name">Pending</span>
+                        <span class="column-count">{{.PendingCount}}</span>
+                    </div>
+                </div>
+                <div class="kanban-column-body">
+                    {{range .Tasks}}
+                    {{if eq .Status "pending"}}
+                    <a href="/lists/{{$.ListID}}/tasks/{{.ID}}" class="kanban-card {{if isBlocked .}}blocked{{end}}">
+                        <div class="card-header">
+                            <span class="card-id">#{{.ID}}</span>
+                            {{if isBlocked .}}
+                            <span class="card-blocked-icon" title="Blocked by dependencies">
+                                <svg viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M8 1a4 4 0 00-4 4v2H3a1 1 0 00-1 1v6a1 1 0 001 1h10a1 1 0 001-1V8a1 1 0 00-1-1h-1V5a4 4 0 00-4-4zm2 6H6V5a2 2 0 114 0v2z"/>
+                                </svg>
+                            </span>
+                            {{end}}
+                        </div>
+                        <div class="card-subject">{{.Subject}}</div>
+                        {{if .Description}}
+                        <div class="card-description">{{truncate .Description 80}}</div>
+                        {{end}}
+                        <div class="card-footer">
+                            {{if .Owner}}
+                            <span class="card-owner" title="Owner: {{.Owner}}">
+                                <svg viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M8 8a3 3 0 100-6 3 3 0 000 6zm-5 6a5 5 0 0110 0H3z"/>
+                                </svg>
+                                {{.Owner}}
+                            </span>
+                            {{end}}
+                            {{if .BlockedBy}}
+                            <span class="card-deps" title="Blocked by {{len .BlockedBy}} task(s)">
+                                {{len .BlockedBy}} dep{{if gt (len .BlockedBy) 1}}s{{end}}
+                            </span>
+                            {{end}}
+                        </div>
+                    </a>
+                    {{end}}
+                    {{end}}
+                    {{if eq .PendingCount 0}}
+                    <div class="kanban-empty">
+                        <span class="empty-icon">○</span>
+                        <span>No pending tasks</span>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+
+            <!-- In Progress Column -->
+            <div class="kanban-column" data-status="in_progress">
+                <div class="kanban-column-header">
+                    <div class="column-title">
+                        <span class="column-indicator progress"></span>
+                        <span class="column-name">In Progress</span>
+                        <span class="column-count">{{.InProgressCount}}</span>
+                    </div>
+                </div>
+                <div class="kanban-column-body">
+                    {{range .Tasks}}
+                    {{if eq .Status "in_progress"}}
+                    <a href="/lists/{{$.ListID}}/tasks/{{.ID}}" class="kanban-card active">
+                        <div class="card-header">
+                            <span class="card-id">#{{.ID}}</span>
+                            <span class="card-active-indicator" title="Currently active">
+                                <svg viewBox="0 0 16 16" fill="currentColor">
+                                    <circle cx="8" cy="8" r="3"/>
+                                </svg>
+                            </span>
+                        </div>
+                        <div class="card-subject">{{.Subject}}</div>
+                        {{if .ActiveForm}}
+                        <div class="card-active-form">{{.ActiveForm}}</div>
+                        {{else if .Description}}
+                        <div class="card-description">{{truncate .Description 80}}</div>
+                        {{end}}
+                        <div class="card-footer">
+                            {{if .Owner}}
+                            <span class="card-owner" title="Owner: {{.Owner}}">
+                                <svg viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M8 8a3 3 0 100-6 3 3 0 000 6zm-5 6a5 5 0 0110 0H3z"/>
+                                </svg>
+                                {{.Owner}}
+                            </span>
+                            {{end}}
+                            {{if .Blocks}}
+                            <span class="card-blocks" title="Blocks {{len .Blocks}} task(s)">
+                                → {{len .Blocks}}
+                            </span>
+                            {{end}}
+                        </div>
+                    </a>
+                    {{end}}
+                    {{end}}
+                    {{if eq .InProgressCount 0}}
+                    <div class="kanban-empty">
+                        <span class="empty-icon">◐</span>
+                        <span>Nothing in progress</span>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+
+            <!-- Completed Column -->
+            <div class="kanban-column" data-status="completed">
+                <div class="kanban-column-header">
+                    <div class="column-title">
+                        <span class="column-indicator completed"></span>
+                        <span class="column-name">Completed</span>
+                        <span class="column-count">{{.CompletedCount}}</span>
+                    </div>
+                </div>
+                <div class="kanban-column-body">
+                    {{range .Tasks}}
+                    {{if eq .Status "completed"}}
+                    <a href="/lists/{{$.ListID}}/tasks/{{.ID}}" class="kanban-card done">
+                        <div class="card-header">
+                            <span class="card-id">#{{.ID}}</span>
+                            <span class="card-done-icon" title="Completed">
+                                <svg viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
+                                </svg>
+                            </span>
+                        </div>
+                        <div class="card-subject">{{.Subject}}</div>
+                        {{if .Description}}
+                        <div class="card-description">{{truncate .Description 60}}</div>
+                        {{end}}
+                        <div class="card-footer">
+                            {{if .Owner}}
+                            <span class="card-owner" title="Owner: {{.Owner}}">
+                                <svg viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M8 8a3 3 0 100-6 3 3 0 000 6zm-5 6a5 5 0 0110 0H3z"/>
+                                </svg>
+                                {{.Owner}}
+                            </span>
+                            {{end}}
+                        </div>
+                    </a>
+                    {{end}}
+                    {{end}}
+                    {{if eq .CompletedCount 0}}
+                    <div class="kanban-empty">
+                        <span class="empty-icon">●</span>
+                        <span>No completed tasks</span>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+    // Keyboard navigation for Kanban board.
+    document.addEventListener('keydown', (e) => {
+        if (e.target.matches('input, textarea')) return;
+
+        const columns = document.querySelectorAll('.kanban-column');
+        const focusedCard = document.querySelector('.kanban-card.focused');
+        let currentCol = 0;
+        let currentIdx = -1;
+
+        if (focusedCard) {
+            const col = focusedCard.closest('.kanban-column');
+            currentCol = Array.from(columns).indexOf(col);
+            const cards = col.querySelectorAll('.kanban-card');
+            currentIdx = Array.from(cards).indexOf(focusedCard);
+        }
+
+        function focusCard(colIdx, cardIdx) {
+            document.querySelectorAll('.kanban-card.focused').forEach(c => c.classList.remove('focused'));
+            const col = columns[colIdx];
+            if (!col) return;
+            const cards = col.querySelectorAll('.kanban-card');
+            if (cards.length === 0) return;
+            const idx = Math.max(0, Math.min(cardIdx, cards.length - 1));
+            cards[idx].classList.add('focused');
+            cards[idx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+
+        switch (e.key) {
+            case 'ArrowRight':
+            case 'l':
+                e.preventDefault();
+                focusCard(Math.min(currentCol + 1, columns.length - 1), Math.max(0, currentIdx));
+                break;
+            case 'ArrowLeft':
+            case 'h':
+                e.preventDefault();
+                focusCard(Math.max(currentCol - 1, 0), Math.max(0, currentIdx));
+                break;
+            case 'ArrowDown':
+            case 'j':
+                e.preventDefault();
+                focusCard(currentCol, currentIdx + 1);
+                break;
+            case 'ArrowUp':
+            case 'k':
+                e.preventDefault();
+                if (currentIdx < 0) {
+                    focusCard(currentCol, 0);
+                } else {
+                    focusCard(currentCol, currentIdx - 1);
+                }
+                break;
+            case 'Enter':
+                if (focusedCard) {
+                    focusedCard.click();
+                }
+                break;
+            case 'Escape':
+                document.querySelectorAll('.kanban-card.focused').forEach(c => c.classList.remove('focused'));
+                break;
+        }
+    });
+
+    // Auto-focus first card on load.
+    document.addEventListener('DOMContentLoaded', () => {
+        const firstCard = document.querySelector('.kanban-card');
+        if (firstCard) {
+            firstCard.classList.add('focused');
+        }
+    });
+    </script>
+</body>
+</html>
+{{end}}
+
+{{define "tasks_list_content"}}
+<!-- Legacy partial for SSE updates - redirects to Kanban -->
+<script>window.location.reload();</script>
+{{end}}

@@ -1,0 +1,136 @@
+{{define "graph.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} | Claude Task Viewer</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/htmx.min.js"></script>
+</head>
+<body class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <a href="/" class="sidebar-brand">
+                <span class="brand-icon"></span>
+                <span class="brand-text">Mission Control</span>
+            </a>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <a href="/" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0L0 6v10h6V9h4v7h6V6L8 0z"/>
+                    </svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/lists/{{.ListID}}" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M2 2h12v2H2V2zm0 4h12v2H2V6zm0 4h8v2H2v-2z"/>
+                    </svg>
+                    <span>Tasks</span>
+                </a>
+                <a href="/lists/{{.ListID}}/graph" class="nav-item active">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M4 3a2 2 0 100 4 2 2 0 000-4zm8 2a2 2 0 100 4 2 2 0 000-4zm-4 6a2 2 0 100 4 2 2 0 000-4z"/>
+                    </svg>
+                    <span>Dependency Graph</span>
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Legend</div>
+                <div class="nav-item subtle">
+                    <span class="filter-dot" style="background: var(--color-warning-400)"></span>
+                    <span>Pending</span>
+                </div>
+                <div class="nav-item subtle">
+                    <span class="filter-dot" style="background: var(--color-success-400)"></span>
+                    <span>In Progress</span>
+                </div>
+                <div class="nav-item subtle">
+                    <span class="filter-dot" style="background: var(--color-muted-400)"></span>
+                    <span>Completed</span>
+                </div>
+                <div class="nav-item subtle">
+                    <span class="filter-dot" style="background: var(--color-error-400)"></span>
+                    <span>Blocked</span>
+                </div>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="keyboard-hints">
+                <div class="hint"><kbd>Esc</kbd> Back to tasks</div>
+                <div class="hint"><kbd>R</kbd> Reset view</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <header class="topbar">
+            <div class="topbar-left">
+                <a href="/lists/{{.ListID}}" class="back-btn" title="Back to tasks">
+                    <svg viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M10 3L5 8l5 5V3z"/>
+                    </svg>
+                </a>
+                <h1 class="page-title">Dependency Graph</h1>
+                <span class="session-badge">{{truncateID .ListID 12}}</span>
+            </div>
+            <div class="topbar-right">
+                <div class="graph-controls">
+                    <button class="btn btn-secondary btn-sm" id="reset-zoom" title="Reset zoom">
+                        <svg viewBox="0 0 16 16" fill="currentColor" style="width:14px;height:14px">
+                            <path d="M8 3a5 5 0 00-4.9 4H1l2.5 2.5L6 7H3.1a4 4 0 117.2 3.3l.8.8A5 5 0 008 3z"/>
+                        </svg>
+                        Reset
+                    </button>
+                    <a href="/lists/{{.ListID}}" class="btn btn-secondary btn-sm">
+                        <svg viewBox="0 0 16 16" fill="currentColor" style="width:14px;height:14px">
+                            <path d="M2 2h12v2H2V2zm0 4h12v2H2V6zm0 4h8v2H2v-2z"/>
+                        </svg>
+                        Task List
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <div class="dashboard graph-view">
+            <div class="panel graph-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <svg viewBox="0 0 16 16" fill="currentColor" style="width:16px;height:16px;opacity:0.5">
+                            <path d="M4 3a2 2 0 100 4 2 2 0 000-4zm8 2a2 2 0 100 4 2 2 0 000-4zm-4 6a2 2 0 100 4 2 2 0 000-4z"/>
+                        </svg>
+                        Task Dependencies
+                    </div>
+                    <div class="panel-actions">
+                        <span class="graph-info">Click a node to view task details</span>
+                    </div>
+                </div>
+                <div id="graph" class="graph-area"></div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/d3.min.js"></script>
+    <script src="/static/graph.js"></script>
+    <script>
+        initGraph('{{.ListID}}');
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                window.location.href = '/lists/{{.ListID}}';
+            } else if (e.key === 'r' || e.key === 'R') {
+                document.getElementById('reset-zoom')?.click();
+            }
+        });
+    </script>
+</body>
+</html>
+{{end}}

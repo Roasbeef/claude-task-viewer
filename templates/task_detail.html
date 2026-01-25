@@ -1,0 +1,248 @@
+{{define "task_detail.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} | Claude Task Viewer</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/htmx.min.js"></script>
+</head>
+<body class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <a href="/" class="sidebar-brand">
+                <span class="brand-icon"></span>
+                <span class="brand-text">Mission Control</span>
+            </a>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <a href="/" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0L0 6v10h6V9h4v7h6V6L8 0z"/>
+                    </svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/lists/{{.ListID}}" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M2 2h12v2H2V2zm0 4h12v2H2V6zm0 4h8v2H2v-2z"/>
+                    </svg>
+                    <span>Tasks</span>
+                </a>
+                <a href="/lists/{{.ListID}}/graph" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M4 3a2 2 0 100 4 2 2 0 000-4zm8 2a2 2 0 100 4 2 2 0 000-4zm-4 6a2 2 0 100 4 2 2 0 000-4z"/>
+                    </svg>
+                    <span>Graph</span>
+                </a>
+            </div>
+
+            {{if or .Blockers .Blocking}}
+            <div class="nav-section">
+                <div class="nav-section-title">Dependencies</div>
+                {{if .Blockers}}
+                <div class="nav-item subtle" style="color: var(--color-error-400)">
+                    <span class="filter-dot" style="background: var(--color-error-400)"></span>
+                    <span>{{len .Blockers}} Blocker{{if gt (len .Blockers) 1}}s{{end}}</span>
+                </div>
+                {{end}}
+                {{if .Blocking}}
+                <div class="nav-item subtle" style="color: var(--color-warning-400)">
+                    <span class="filter-dot" style="background: var(--color-warning-400)"></span>
+                    <span>Blocks {{len .Blocking}} task{{if gt (len .Blocking) 1}}s{{end}}</span>
+                </div>
+                {{end}}
+            </div>
+            {{end}}
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="keyboard-hints">
+                <div class="hint"><kbd>Esc</kbd> Back to list</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <header class="topbar">
+            <div class="topbar-left">
+                <a href="/lists/{{.ListID}}" class="back-btn" title="Back to list">
+                    <svg viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M10 3L5 8l5 5V3z"/>
+                    </svg>
+                </a>
+                <h1 class="page-title">Task #{{.TaskID}}</h1>
+                <span class="task-status-badge {{statusClass .Task.Status}}">
+                    {{statusIcon .Task.Status}} {{.Task.Status}}
+                </span>
+            </div>
+            <div class="topbar-right">
+                <a href="/lists/{{.ListID}}/graph" class="btn btn-secondary btn-sm">
+                    View in Graph
+                </a>
+            </div>
+        </header>
+
+        <div class="dashboard task-detail-view">
+            <!-- Task Header Card -->
+            <section class="panel task-header-panel">
+                <div class="task-detail-header">
+                    <div class="task-status-indicator {{statusClass .Task.Status}}">
+                        {{if eq .Task.Status "pending"}}
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        {{else if eq .Task.Status "in_progress"}}
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="18 36">
+                                <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/>
+                            </circle>
+                        </svg>
+                        {{else}}
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.2"/>
+                            <path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        {{end}}
+                    </div>
+                    <div class="task-detail-info">
+                        <h1 class="task-detail-subject">{{.Task.Subject}}</h1>
+                        <div class="task-detail-meta">
+                            <span class="meta-id">#{{.Task.ID}}</span>
+                            {{if .Task.Owner}}
+                            <span class="meta-owner">
+                                <svg viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M8 8a3 3 0 100-6 3 3 0 000 6zm-5 6a5 5 0 0110 0H3z"/>
+                                </svg>
+                                {{.Task.Owner}}
+                            </span>
+                            {{end}}
+                            {{if .Task.ActiveForm}}
+                            <span class="meta-active">{{.Task.ActiveForm}}</span>
+                            {{end}}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {{if .Task.Description}}
+            <!-- Description Section -->
+            <section class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">Description</div>
+                </div>
+                <div class="task-description-content">
+                    <pre class="task-description-text">{{.Task.Description}}</pre>
+                </div>
+            </section>
+            {{end}}
+
+            {{if or .Blockers .Blocking}}
+            <!-- Dependencies Section -->
+            <section class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">Dependencies</div>
+                </div>
+                <div class="task-deps-content">
+                    {{if .Blockers}}
+                    <div class="deps-group blockers">
+                        <h3 class="deps-group-title">
+                            <svg viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 1a4 4 0 00-4 4v2H3a1 1 0 00-1 1v6a1 1 0 001 1h10a1 1 0 001-1V8a1 1 0 00-1-1h-1V5a4 4 0 00-4-4zm2 6H6V5a2 2 0 114 0v2z"/>
+                            </svg>
+                            Blocked By
+                        </h3>
+                        <div class="deps-list">
+                            {{range .Blockers}}
+                            <a href="/lists/{{$.ListID}}/tasks/{{.ID}}" class="dep-card">
+                                <div class="dep-status {{statusClass .Status}}">
+                                    {{statusIcon .Status}}
+                                </div>
+                                <div class="dep-info">
+                                    <span class="dep-id">#{{.ID}}</span>
+                                    <span class="dep-subject">{{.Subject}}</span>
+                                </div>
+                            </a>
+                            {{end}}
+                        </div>
+                    </div>
+                    {{end}}
+
+                    {{if .Blocking}}
+                    <div class="deps-group blocking">
+                        <h3 class="deps-group-title">
+                            <svg viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 0a8 8 0 100 16A8 8 0 008 0zm0 14A6 6 0 118 2a6 6 0 010 12zm-1-5V5h2v4H7zm0 3v-2h2v2H7z"/>
+                            </svg>
+                            Blocks
+                        </h3>
+                        <div class="deps-list">
+                            {{range .Blocking}}
+                            <a href="/lists/{{$.ListID}}/tasks/{{.ID}}" class="dep-card">
+                                <div class="dep-status {{statusClass .Status}}">
+                                    {{statusIcon .Status}}
+                                </div>
+                                <div class="dep-info">
+                                    <span class="dep-id">#{{.ID}}</span>
+                                    <span class="dep-subject">{{.Subject}}</span>
+                                </div>
+                            </a>
+                            {{end}}
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+            </section>
+            {{end}}
+
+            {{if .Task.Metadata}}
+            <!-- Metadata Section -->
+            <section class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">Metadata</div>
+                </div>
+                <div class="task-metadata-content">
+                    <dl class="metadata-grid">
+                        {{range $k, $v := .Task.Metadata}}
+                        <div class="metadata-item">
+                            <dt>{{$k}}</dt>
+                            <dd>{{$v}}</dd>
+                        </div>
+                        {{end}}
+                    </dl>
+                </div>
+            </section>
+            {{end}}
+
+            <!-- Actions -->
+            <div class="task-detail-actions">
+                <a href="/lists/{{.ListID}}" class="btn btn-secondary">
+                    <svg viewBox="0 0 16 16" fill="currentColor" style="width:14px;height:14px">
+                        <path d="M10 3L5 8l5 5V3z"/>
+                    </svg>
+                    Back to List
+                </a>
+                <a href="/lists/{{.ListID}}/graph" class="btn btn-secondary">
+                    <svg viewBox="0 0 16 16" fill="currentColor" style="width:14px;height:14px">
+                        <path d="M4 3a2 2 0 100 4 2 2 0 000-4zm8 2a2 2 0 100 4 2 2 0 000-4zm-4 6a2 2 0 100 4 2 2 0 000-4z"/>
+                    </svg>
+                    View Graph
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <script>
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            window.location.href = '/lists/{{.ListID}}';
+        }
+    });
+    </script>
+</body>
+</html>
+{{end}}

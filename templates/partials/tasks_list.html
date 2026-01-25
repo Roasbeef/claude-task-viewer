@@ -1,0 +1,33 @@
+{{define "tasks_list.html"}}
+{{if .Tasks}}
+{{range .Tasks}}
+<div class="task-row {{statusClass .Status}} {{if isBlocked .}}blocked{{end}}"
+     id="task-{{.ID}}">
+    <div class="task-row-status">
+        <span class="status-icon">{{statusIcon .Status}}</span>
+    </div>
+    <div class="task-row-content">
+        <a href="/lists/{{$.ListID}}/tasks/{{.ID}}" class="task-row-subject">
+            {{.Subject}}
+        </a>
+        {{if .Description}}
+        <p class="task-row-description">{{.Description}}</p>
+        {{end}}
+        <div class="task-row-meta">
+            <span class="task-id">#{{.ID}}</span>
+            {{if .Owner}}
+            <span class="task-owner">{{.Owner}}</span>
+            {{end}}
+            {{if isBlocked .}}
+            <span class="task-blocked-badge">Blocked</span>
+            {{end}}
+        </div>
+    </div>
+</div>
+{{end}}
+{{else}}
+<div class="empty-state">
+    <p>No tasks match the current filter.</p>
+</div>
+{{end}}
+{{end}}

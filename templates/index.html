@@ -1,0 +1,351 @@
+{{define "index.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} | Claude Task Viewer</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/htmx.min.js"></script>
+</head>
+<body class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-brand">
+                <span class="brand-icon"></span>
+                <span class="brand-text">Mission Control</span>
+            </div>
+            <button class="cmd-palette-trigger" title="Command palette (⌘K)">
+                <span class="cmd-key">⌘K</span>
+            </button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <a href="/" class="nav-item active">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0L0 6v10h6V9h4v7h6V6L8 0z"/>
+                    </svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#projects" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M2 2h12v12H2V2zm1 1v10h10V3H3z"/>
+                    </svg>
+                    <span>Projects</span>
+                    <span class="nav-badge">{{len .Groups}}</span>
+                </a>
+                {{if .ActiveLists}}
+                <a href="#active" class="nav-item has-activity">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0a8 8 0 100 16A8 8 0 008 0zm1 12H7V7h2v5zm0-6H7V4h2v2z"/>
+                    </svg>
+                    <span>Active Sessions</span>
+                    <span class="nav-badge live">{{len .ActiveLists}}</span>
+                </a>
+                {{end}}
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Quick Filters</div>
+                <a href="#recent" class="nav-item subtle">
+                    <span class="filter-dot recent"></span>
+                    <span>Recent Activity</span>
+                </a>
+                <a href="#starred" class="nav-item subtle">
+                    <span class="filter-dot starred"></span>
+                    <span>Starred</span>
+                </a>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="keyboard-hints">
+                <div class="hint"><kbd>↑↓</kbd> Navigate</div>
+                <div class="hint"><kbd>↵</kbd> Open</div>
+                <div class="hint"><kbd>⌘K</kbd> Commands</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Bar with Search -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <h1 class="page-title">Dashboard</h1>
+            </div>
+            <div class="topbar-center">
+                <div class="search-bar">
+                    <svg class="search-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M11.742 10.344a6.5 6.5 0 10-1.397 1.398l3.85 3.85a1 1 0 001.415-1.414l-3.868-3.834zm-5.44.156a5 5 0 110-10 5 5 0 010 10z"/>
+                    </svg>
+                    <input type="text" placeholder="Search projects, sessions, tasks..." class="search-input">
+                    <kbd class="search-kbd">/</kbd>
+                </div>
+            </div>
+            <div class="topbar-right">
+                <div class="status-indicator online">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Live</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dashboard Content -->
+        <div class="dashboard">
+            <!-- Metrics Row -->
+            <section class="metrics-row">
+                <div class="metric-card">
+                    <div class="metric-icon projects"></div>
+                    <div class="metric-content">
+                        <div class="metric-value">{{len .Groups}}</div>
+                        <div class="metric-label">Projects</div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon sessions"></div>
+                    <div class="metric-content">
+                        <div class="metric-value">{{range $i, $g := .Groups}}{{if $i}}{{end}}{{end}}{{with index .Groups 0}}{{.TotalSessions}}+{{end}}</div>
+                        <div class="metric-label">Total Sessions</div>
+                    </div>
+                </div>
+                {{if .ActiveLists}}
+                <div class="metric-card highlight">
+                    <div class="metric-icon active"></div>
+                    <div class="metric-content">
+                        <div class="metric-value">{{len .ActiveLists}}</div>
+                        <div class="metric-label">Active Now</div>
+                    </div>
+                    <div class="metric-pulse"></div>
+                </div>
+                {{end}}
+                <div class="metric-card">
+                    <div class="metric-icon tasks"></div>
+                    <div class="metric-content">
+                        <div class="metric-value">{{if .ActiveLists}}{{with index .ActiveLists 0}}{{.TaskCount}}{{end}}{{else}}0{{end}}</div>
+                        <div class="metric-label">Open Tasks</div>
+                    </div>
+                </div>
+            </section>
+
+            {{if .ActiveLists}}
+            <!-- Active Sessions Panel -->
+            <section class="panel active-panel" id="active">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <span class="live-indicator"></span>
+                        Active Sessions
+                    </div>
+                    <div class="panel-actions">
+                        <button class="panel-action">View All</button>
+                    </div>
+                </div>
+                <div class="active-sessions">
+                    {{range .ActiveLists}}
+                    <a href="/lists/{{.SessionID}}" class="active-session-card">
+                        <div class="session-status-bar"></div>
+                        <div class="session-content">
+                            <div class="session-header">
+                                <span class="session-task-count">{{.TaskCount}} tasks</span>
+                                <span class="session-time">now</span>
+                            </div>
+                            {{if .ProjectName}}
+                            <div class="session-project">{{.ProjectName}}</div>
+                            {{end}}
+                            <div class="session-id">{{.SessionID}}</div>
+                            <div class="session-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 33%"></div>
+                                </div>
+                                <span class="progress-text">In Progress</span>
+                            </div>
+                        </div>
+                        <div class="session-action">
+                            <svg viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M6 3l5 5-5 5V3z"/>
+                            </svg>
+                        </div>
+                    </a>
+                    {{end}}
+                </div>
+            </section>
+            {{end}}
+
+            <!-- Projects Grid -->
+            <section class="panel" id="projects">
+                <div class="panel-header">
+                    <div class="panel-title">Projects</div>
+                    <div class="panel-tabs">
+                        <button class="panel-tab active">All</button>
+                        <button class="panel-tab">Recent</button>
+                        <button class="panel-tab">Starred</button>
+                    </div>
+                </div>
+
+                {{if .Groups}}
+                <div class="projects-stream">
+                    {{range $idx, $group := .Groups}}
+                    <div class="project-row" style="--row-index: {{$idx}}">
+                        <div class="project-row-header">
+                            <div class="project-identity">
+                                <div class="project-avatar">
+                                    {{if .Org}}{{slice .Org 0 1}}{{else}}{{slice .BaseRepo 0 1}}{{end}}
+                                </div>
+                                <div class="project-info">
+                                    <h3 class="project-name">
+                                        {{if .Org}}<span class="org-prefix">{{.Org}}/</span>{{end}}{{.BaseRepo}}
+                                    </h3>
+                                    <div class="project-meta">
+                                        <span class="meta-item">{{.TotalSessions}} sessions</span>
+                                        <span class="meta-sep">·</span>
+                                        <span class="meta-item">{{len .Projects}} worktree{{if gt (len .Projects) 1}}s{{end}}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="project-row-actions">
+                                <button class="icon-btn" title="Star project">
+                                    <svg viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"/>
+                                    </svg>
+                                </button>
+                                <button class="icon-btn expand-btn" title="Expand">
+                                    <svg viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M4 6l4 4 4-4H4z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="project-worktrees">
+                            {{range .Projects}}
+                            <a href="/projects/{{.DirName}}" class="worktree-card">
+                                <div class="worktree-header">
+                                    <span class="worktree-name">{{.Name}}</span>
+                                    {{if .LastBranch}}
+                                    <span class="worktree-branch">
+                                        <svg viewBox="0 0 16 16" fill="currentColor" class="branch-icon">
+                                            <path d="M11.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122V6A2.5 2.5 0 0110 8.5H6a1 1 0 00-1 1v1.128a2.251 2.251 0 11-1.5 0V5.372a2.25 2.25 0 111.5 0v1.836A2.492 2.492 0 016 7h4a1 1 0 001-1v-.628A2.25 2.25 0 019.5 3.25zM4.25 12a.75.75 0 100 1.5.75.75 0 000-1.5zM3.5 3.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0z"/>
+                                        </svg>
+                                        {{.LastBranch}}
+                                    </span>
+                                    {{end}}
+                                </div>
+                                <div class="worktree-stats">
+                                    <span class="stat"><strong>{{.SessionCount}}</strong> sessions</span>
+                                </div>
+                                {{if .LastSummary}}
+                                <p class="worktree-summary">{{truncate .LastSummary 80}}</p>
+                                {{end}}
+                                {{if not .LastModified.IsZero}}
+                                <div class="worktree-time">{{formatTime .LastModified}}</div>
+                                {{end}}
+                            </a>
+                            {{end}}
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+                {{else}}
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="6" y="10" width="36" height="28" rx="2"/>
+                            <path d="M6 18h36M14 14v0M20 14v0M26 14v0"/>
+                        </svg>
+                    </div>
+                    <h3>No projects yet</h3>
+                    <p>Projects are indexed from <code>~/.claude/projects/</code></p>
+                    <p class="empty-hint">Start a Claude Code session to see projects here</p>
+                </div>
+                {{end}}
+            </section>
+        </div>
+    </main>
+
+    <script>
+    // Search functionality
+    const searchInput = document.querySelector('.search-input');
+    const projectRows = document.querySelectorAll('.project-row');
+    const worktreeCards = document.querySelectorAll('.worktree-card');
+
+    function performSearch(query) {
+        const q = query.toLowerCase().trim();
+
+        if (!q) {
+            // Show all items when search is empty.
+            projectRows.forEach(row => row.classList.remove('hidden'));
+            worktreeCards.forEach(card => card.classList.remove('hidden'));
+            return;
+        }
+
+        // Filter project rows.
+        projectRows.forEach(row => {
+            const projectName = row.querySelector('.project-name')?.textContent?.toLowerCase() || '';
+            const worktrees = row.querySelectorAll('.worktree-card');
+            let hasMatch = projectName.includes(q);
+
+            // Check worktrees within this project.
+            worktrees.forEach(card => {
+                const name = card.querySelector('.worktree-name')?.textContent?.toLowerCase() || '';
+                const branch = card.querySelector('.worktree-branch')?.textContent?.toLowerCase() || '';
+                const summary = card.querySelector('.worktree-summary')?.textContent?.toLowerCase() || '';
+
+                if (name.includes(q) || branch.includes(q) || summary.includes(q)) {
+                    hasMatch = true;
+                    card.classList.remove('hidden');
+                } else {
+                    card.classList.add('hidden');
+                }
+            });
+
+            if (hasMatch) {
+                row.classList.remove('hidden');
+            } else {
+                row.classList.add('hidden');
+            }
+        });
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            performSearch(e.target.value);
+        });
+
+        // Clear search on Escape.
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                searchInput.value = '';
+                performSearch('');
+                searchInput.blur();
+            }
+        });
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+        // Cmd/Ctrl + K for command palette
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            // Focus search as command palette alternative.
+            searchInput?.focus();
+        }
+        // / to focus search
+        if (e.key === '/' && !e.target.matches('input, textarea')) {
+            e.preventDefault();
+            searchInput?.focus();
+        }
+    });
+
+    // Expand/collapse project rows
+    document.querySelectorAll('.expand-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const row = btn.closest('.project-row');
+            row.classList.toggle('expanded');
+        });
+    });
+    </script>
+</body>
+</html>
+{{end}}

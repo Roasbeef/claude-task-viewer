@@ -1,0 +1,89 @@
+{{define "error.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error | Claude Task Viewer</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <a href="/" class="sidebar-brand">
+                <span class="brand-icon"></span>
+                <span class="brand-text">Mission Control</span>
+            </a>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <a href="/" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0L0 6v10h6V9h4v7h6V6L8 0z"/>
+                    </svg>
+                    <span>Dashboard</span>
+                </a>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="keyboard-hints">
+                <div class="hint"><kbd>Esc</kbd> Go home</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <header class="topbar">
+            <div class="topbar-left">
+                <a href="/" class="back-btn" title="Back to dashboard">
+                    <svg viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M10 3L5 8l5 5V3z"/>
+                    </svg>
+                </a>
+                <h1 class="page-title">Error</h1>
+            </div>
+        </header>
+
+        <div class="dashboard error-view">
+            <div class="error-container">
+                <div class="error-icon">
+                    <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="32" cy="32" r="28" stroke="var(--color-error-400)"/>
+                        <path d="M32 18v18" stroke="var(--color-error-400)" stroke-width="3" stroke-linecap="round"/>
+                        <circle cx="32" cy="46" r="2" fill="var(--color-error-400)"/>
+                    </svg>
+                </div>
+                <h2 class="error-title">Something went wrong</h2>
+                <p class="error-message">{{.Error}}</p>
+                <div class="error-actions">
+                    <a href="/" class="btn btn-primary">
+                        <svg viewBox="0 0 16 16" fill="currentColor" style="width:14px;height:14px">
+                            <path d="M8 0L0 6v10h6V9h4v7h6V6L8 0z"/>
+                        </svg>
+                        Go to Dashboard
+                    </a>
+                    <button onclick="history.back()" class="btn btn-secondary">
+                        <svg viewBox="0 0 16 16" fill="currentColor" style="width:14px;height:14px">
+                            <path d="M10 3L5 8l5 5V3z"/>
+                        </svg>
+                        Go Back
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            window.location.href = '/';
+        }
+    });
+    </script>
+</body>
+</html>
+{{end}}

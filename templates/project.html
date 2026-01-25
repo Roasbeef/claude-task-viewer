@@ -1,0 +1,229 @@
+{{define "project.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} | Claude Task Viewer</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/htmx.min.js"></script>
+</head>
+<body class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <a href="/" class="sidebar-brand">
+                <span class="brand-icon"></span>
+                <span class="brand-text">Mission Control</span>
+            </a>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <a href="/" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0L0 6v10h6V9h4v7h6V6L8 0z"/>
+                    </svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item active">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M2 2h12v12H2V2zm1 1v10h10V3H3z"/>
+                    </svg>
+                    <span>{{.Project.Name}}</span>
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Session Stats</div>
+                <div class="nav-item subtle">
+                    <span class="filter-dot" style="background: var(--color-accent-400)"></span>
+                    <span>{{len .Sessions}} Session{{if ne (len .Sessions) 1}}s{{end}}</span>
+                </div>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="keyboard-hints">
+                <div class="hint"><kbd>J/K</kbd> Navigate</div>
+                <div class="hint"><kbd>Esc</kbd> Dashboard</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <header class="topbar">
+            <div class="topbar-left">
+                <a href="/" class="back-btn" title="Back to dashboard">
+                    <svg viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M10 3L5 8l5 5V3z"/>
+                    </svg>
+                </a>
+                <h1 class="page-title">{{.Project.Name}}</h1>
+            </div>
+            <div class="topbar-right">
+                <span class="project-path-badge">{{.Project.Path}}</span>
+            </div>
+        </header>
+
+        <div class="dashboard project-view">
+            <!-- Project Stats -->
+            <section class="metrics-row project-metrics">
+                <div class="metric-card">
+                    <div class="metric-icon sessions"></div>
+                    <div class="metric-content">
+                        <div class="metric-value">{{len .Sessions}}</div>
+                        <div class="metric-label">Sessions</div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon tasks"></div>
+                    <div class="metric-content">
+                        <div class="metric-value">{{range .Sessions}}{{if .HasTasks}}+{{end}}{{end}}0</div>
+                        <div class="metric-label">With Tasks</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sessions Panel -->
+            <section class="panel sessions-panel">
+                <div class="panel-header">
+                    <div class="panel-title">Sessions</div>
+                    <div class="panel-actions">
+                        <span class="session-count-label">{{len .Sessions}} session{{if ne (len .Sessions) 1}}s{{end}}</span>
+                    </div>
+                </div>
+
+                {{if .Sessions}}
+                <div class="sessions-stream">
+                    {{range $idx, $session := .Sessions}}
+                    <div class="session-card-new" style="--session-index: {{$idx}}">
+                        <div class="session-card-header">
+                            <div class="session-info">
+                                {{if .Summary}}
+                                <h3 class="session-title">{{.Summary}}</h3>
+                                {{else}}
+                                <h3 class="session-title">Session</h3>
+                                {{end}}
+                                <span class="session-id-badge">{{truncateID .SessionID 12}}</span>
+                            </div>
+                            {{if .GitBranch}}
+                            <span class="session-branch-badge">
+                                <svg viewBox="0 0 16 16" fill="currentColor" style="width:12px;height:12px">
+                                    <path d="M11.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122V6A2.5 2.5 0 0110 8.5H6a1 1 0 00-1 1v1.128a2.251 2.251 0 11-1.5 0V5.372a2.25 2.25 0 111.5 0v1.836A2.492 2.492 0 016 7h4a1 1 0 001-1v-.628A2.25 2.25 0 019.5 3.25zM4.25 12a.75.75 0 100 1.5.75.75 0 000-1.5zM3.5 3.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0z"/>
+                                </svg>
+                                {{.GitBranch}}
+                            </span>
+                            {{end}}
+                        </div>
+
+                        {{if .FirstPrompt}}
+                        <p class="session-prompt">{{truncate .FirstPrompt 180}}</p>
+                        {{end}}
+
+                        <div class="session-meta-row">
+                            {{if .MessageCount}}
+                            <span class="session-meta-item">
+                                <svg viewBox="0 0 16 16" fill="currentColor" style="width:12px;height:12px">
+                                    <path d="M2 2h12v9H5l-3 3V2z"/>
+                                </svg>
+                                {{.MessageCount}} messages
+                            </span>
+                            {{end}}
+                            {{if .HasTasks}}
+                            <span class="session-meta-item has-tasks">
+                                <svg viewBox="0 0 16 16" fill="currentColor" style="width:12px;height:12px">
+                                    <path d="M2 2h12v2H2V2zm0 4h12v2H2V6zm0 4h8v2H2v-2z"/>
+                                </svg>
+                                {{.TaskCount}} tasks
+                            </span>
+                            {{end}}
+                            {{if not .Modified.IsZero}}
+                            <span class="session-meta-item session-time">
+                                {{formatTime .Modified}}
+                            </span>
+                            {{end}}
+                        </div>
+
+                        {{if .HasTasks}}
+                        <div class="session-actions">
+                            <a href="/lists/{{.SessionID}}" class="btn btn-secondary btn-sm">
+                                <svg viewBox="0 0 16 16" fill="currentColor" style="width:12px;height:12px">
+                                    <path d="M2 2h12v2H2V2zm0 4h12v2H2V6zm0 4h8v2H2v-2z"/>
+                                </svg>
+                                View Tasks
+                            </a>
+                            <a href="/lists/{{.SessionID}}/graph" class="btn btn-secondary btn-sm">
+                                <svg viewBox="0 0 16 16" fill="currentColor" style="width:12px;height:12px">
+                                    <path d="M4 3a2 2 0 100 4 2 2 0 000-4zm8 2a2 2 0 100 4 2 2 0 000-4zm-4 6a2 2 0 100 4 2 2 0 000-4z"/>
+                                </svg>
+                                Graph
+                            </a>
+                        </div>
+                        {{end}}
+                    </div>
+                    {{end}}
+                </div>
+                {{else}}
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="8" y="8" width="32" height="32" rx="4"/>
+                            <path d="M16 20h16M16 28h10"/>
+                        </svg>
+                    </div>
+                    <h3>No sessions yet</h3>
+                    <p>Start a Claude Code session in this project to see it here.</p>
+                </div>
+                {{end}}
+            </section>
+
+            <!-- Actions -->
+            <div class="project-actions">
+                <a href="/" class="btn btn-secondary">
+                    <svg viewBox="0 0 16 16" fill="currentColor" style="width:14px;height:14px">
+                        <path d="M10 3L5 8l5 5V3z"/>
+                    </svg>
+                    Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <script>
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            window.location.href = '/';
+        }
+
+        const sessions = document.querySelectorAll('.session-card-new');
+        const focused = document.querySelector('.session-card-new.focused');
+        let idx = Array.from(sessions).indexOf(focused);
+
+        if (e.key === 'j' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (focused) focused.classList.remove('focused');
+            idx = Math.min(idx + 1, sessions.length - 1);
+            if (sessions[idx]) {
+                sessions[idx].classList.add('focused');
+                sessions[idx].scrollIntoView({ block: 'nearest' });
+            }
+        } else if (e.key === 'k' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (focused) focused.classList.remove('focused');
+            idx = Math.max(idx - 1, 0);
+            if (sessions[idx]) {
+                sessions[idx].classList.add('focused');
+                sessions[idx].scrollIntoView({ block: 'nearest' });
+            }
+        } else if (e.key === 'Enter' && focused) {
+            const link = focused.querySelector('.btn');
+            if (link) link.click();
+        }
+    });
+    </script>
+</body>
+</html>
+{{end}}
