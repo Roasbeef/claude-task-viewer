@@ -1,6 +1,7 @@
 package taskviewer
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"fmt"
@@ -8,12 +9,16 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/btcsuite/btclog/v2"
 	claudeagent "github.com/roasbeef/claude-agent-sdk-go"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/renderer/html"
 )
 
 // Ensure time is used for template functions.
@@ -22,6 +27,19 @@ var _ = time.Now
 //go:embed templates/*
 var templatesFS embed.FS
 
+// mdRenderer is the shared markdown renderer.
+var mdRenderer = goldmark.New(
+	goldmark.WithExtensions(
+		extension.GFM,
+		extension.Strikethrough,
+		extension.TaskList,
+	),
+	goldmark.WithRendererOptions(
+		html.WithHardWraps(),
+		html.WithUnsafe(),
+	),
+)
+
 //go:embed static/*
 var staticFS embed.FS
 
@@ -29,11 +47,12 @@ var staticFS embed.FS
 type HTTPServer struct {
 	cfg *HTTPConfig
 
-	server         *http.Server
-	listener       net.Listener
-	taskStore      claudeagent.TaskStore
-	projectIndexer *ProjectIndexer
-	templates      *template.Template
+	server          *http.Server
+	listener        net.Listener
+	taskStore       claudeagent.TaskStore
+	projectIndexer  *ProjectIndexer
+	instanceTracker *InstanceTracker
+	templates       *template.Template
 
 	// sseClients tracks active SSE connections per list ID.
 	sseClients   map[string][]chan []byte
@@ -62,14 +81,18 @@ func NewHTTPServer(cfg *HTTPConfig, taskStore claudeagent.TaskStore,
 	// Create project indexer using same base dir as task store.
 	projectIndexer := NewProjectIndexer(cfg.ClaudeDir)
 
+	// Create instance tracker for detecting running Claude processes.
+	instanceTracker := NewInstanceTracker(projectIndexer)
+
 	h := &HTTPServer{
-		cfg:            cfg,
-		taskStore:      taskStore,
-		projectIndexer: projectIndexer,
-		templates:      tmpl,
-		sseClients:     make(map[string][]chan []byte),
-		quit:           make(chan struct{}),
-		log:            log,
+		cfg:             cfg,
+		taskStore:       taskStore,
+		projectIndexer:  projectIndexer,
+		instanceTracker: instanceTracker,
+		templates:       tmpl,
+		sseClients:      make(map[string][]chan []byte),
+		quit:            make(chan struct{}),
+		log:             log,
 	}
 
 	return h, nil
@@ -78,6 +101,13 @@ func NewHTTPServer(cfg *HTTPConfig, taskStore claudeagent.TaskStore,
 // templateFuncs returns the custom template functions.
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{
+		"renderMarkdown": func(s string) template.HTML {
+			var buf bytes.Buffer
+			if err := mdRenderer.Convert([]byte(s), &buf); err != nil {
+				return template.HTML("<pre>" + s + "</pre>")
+			}
+			return template.HTML(buf.String())
+		},
 		"statusClass": func(status claudeagent.TaskListStatus) string {
 			switch status {
 			case claudeagent.TaskListStatusPending:
@@ -128,6 +158,20 @@ func templateFuncs() template.FuncMap {
 				return s
 			}
 			return s[:n] + "..."
+		},
+		"isValidPrompt": func(s string) bool {
+			if s == "" {
+				return false
+			}
+			// Filter out placeholder/invalid prompts.
+			lower := strings.ToLower(s)
+			if lower == "no prompt" || lower == "[no prompt]" {
+				return false
+			}
+			if strings.HasPrefix(lower, "[request interrupted") {
+				return false
+			}
+			return true
 		},
 	}
 }
@@ -209,6 +253,7 @@ func (h *HTTPServer) registerRoutes(mux *http.ServeMux) {
 
 	// Pages.
 	mux.HandleFunc("GET /", h.handleIndex)
+	mux.HandleFunc("GET /tasks", h.handleAllTasks)
 	mux.HandleFunc("GET /projects/{projectID}", h.handleProjectView)
 	mux.HandleFunc("GET /lists/{listID}", h.handleListView)
 	mux.HandleFunc("GET /lists/{listID}/tasks/{taskID}", h.handleTaskDetail)
@@ -223,6 +268,22 @@ func (h *HTTPServer) registerRoutes(mux *http.ServeMux) {
 		"GET /partials/task/{listID}/{taskID}", h.handleTaskPartial,
 	)
 	mux.HandleFunc("GET /partials/tasks/{listID}", h.handleTasksPartial)
+	mux.HandleFunc("GET /partials/instances", h.handleInstancesPartial)
+	mux.HandleFunc(
+		"GET /partials/active-sessions", h.handleActiveSessionsPartial,
+	)
+	mux.HandleFunc(
+		"GET /partials/sessions/{projectID}", h.handleSessionsPartial,
+	)
+	mux.HandleFunc(
+		"GET /partials/project-group/{baseRepo}", h.handleProjectGroupPartial,
+	)
+	mux.HandleFunc(
+		"GET /partials/task-counts/{listID}", h.handleTaskCountsPartial,
+	)
+
+	// Instance API.
+	mux.HandleFunc("GET /api/instances", h.handleInstancesAPI)
 }
 
 // addSSEClient registers a new SSE client for a task list.

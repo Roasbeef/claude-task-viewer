@@ -1,0 +1,51 @@
+{{define "project_group_partial.html"}}
+<div class="project-row" style="--row-index: 0;">
+    <div class="project-row-header">
+        <div class="project-identity">
+            <div class="project-avatar">{{index .BaseRepo 0}}</div>
+            <div class="project-info">
+                <span class="project-name">{{.BaseRepo}}</span>
+                <span class="project-meta">
+                    <span>{{len .Projects}} worktree{{if gt (len .Projects) 1}}s{{end}}</span>
+                    <span class="meta-sep">·</span>
+                    <span>{{.TotalSessions}} session{{if gt .TotalSessions 1}}s{{end}}</span>
+                </span>
+            </div>
+        </div>
+        <div class="project-row-actions">
+            <button class="icon-btn" title="Expand">
+                <svg viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M4 5l4 4 4-4H4z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <div class="project-worktrees">
+        {{range .Projects}}
+        <a href="/projects/{{.DirName}}" class="worktree-card">
+            <div class="worktree-header">
+                <span class="worktree-name">{{.Name}}</span>
+                {{if .LastBranch}}
+                <span class="worktree-branch">
+                    <svg class="branch-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.492 2.492 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25z"/>
+                    </svg>
+                    {{.LastBranch}}
+                </span>
+                {{end}}
+            </div>
+            <div class="worktree-stats">
+                <strong>{{.SessionCount}}</strong> session{{if gt .SessionCount 1}}s{{end}}
+            </div>
+            {{if .LastSummary}}
+            <div class="worktree-summary">{{truncate .LastSummary 80}}</div>
+            {{end}}
+            {{if not .LastModified.IsZero}}
+            <div class="worktree-time">{{formatTime .LastModified}}</div>
+            {{end}}
+        </a>
+        {{end}}
+    </div>
+</div>
+{{end}}

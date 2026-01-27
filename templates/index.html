@@ -8,17 +8,16 @@
     <link rel="stylesheet" href="/static/style.css">
     <script src="/static/htmx.min.js"></script>
 </head>
-<body class="app-layout">
+<body class="app-layout" hx-boost="true">
+    <!-- Global loading indicator -->
+    <div id="global-loader" class="htmx-indicator"></div>
     <!-- Sidebar -->
     <aside class="sidebar">
         <div class="sidebar-header">
             <div class="sidebar-brand">
                 <span class="brand-icon"></span>
-                <span class="brand-text">Mission Control</span>
+                <span class="brand-text">Task Archive</span>
             </div>
-            <button class="cmd-palette-trigger" title="Command palette (⌘K)">
-                <span class="cmd-key">⌘K</span>
-            </button>
         </div>
 
         <nav class="sidebar-nav">
@@ -47,24 +46,11 @@
                 {{end}}
             </div>
 
-            <div class="nav-section">
-                <div class="nav-section-title">Quick Filters</div>
-                <a href="#recent" class="nav-item subtle">
-                    <span class="filter-dot recent"></span>
-                    <span>Recent Activity</span>
-                </a>
-                <a href="#starred" class="nav-item subtle">
-                    <span class="filter-dot starred"></span>
-                    <span>Starred</span>
-                </a>
-            </div>
         </nav>
 
         <div class="sidebar-footer">
             <div class="keyboard-hints">
-                <div class="hint"><kbd>↑↓</kbd> Navigate</div>
-                <div class="hint"><kbd>↵</kbd> Open</div>
-                <div class="hint"><kbd>⌘K</kbd> Commands</div>
+                <div class="hint"><kbd>/</kbd> Search</div>
             </div>
         </div>
     </aside>
@@ -95,6 +81,23 @@
 
         <!-- Dashboard Content -->
         <div class="dashboard">
+            <!-- Running Instances Panel -->
+            <section class="panel instances-panel" id="instances">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <span class="live-indicator"></span>
+                        Running Instances
+                    </div>
+                </div>
+                <div id="instances-content"
+                     hx-get="/partials/instances"
+                     hx-trigger="load, every 5s"
+                     hx-swap="innerHTML"
+                     hx-indicator="#global-loader">
+                    <div class="instances-loading">Loading...</div>
+                </div>
+            </section>
+
             <!-- Metrics Row -->
             <section class="metrics-row">
                 <div class="metric-card">
@@ -121,16 +124,15 @@
                     <div class="metric-pulse"></div>
                 </div>
                 {{end}}
-                <div class="metric-card">
+                <a href="/tasks" class="metric-card clickable">
                     <div class="metric-icon tasks"></div>
                     <div class="metric-content">
-                        <div class="metric-value">{{if .ActiveLists}}{{with index .ActiveLists 0}}{{.TaskCount}}{{end}}{{else}}0{{end}}</div>
+                        <div class="metric-value">{{.TotalTaskCount}}</div>
                         <div class="metric-label">Open Tasks</div>
                     </div>
-                </div>
+                </a>
             </section>
 
-            {{if .ActiveLists}}
             <!-- Active Sessions Panel -->
             <section class="panel active-panel" id="active">
                 <div class="panel-header">
@@ -138,50 +140,58 @@
                         <span class="live-indicator"></span>
                         Active Sessions
                     </div>
-                    <div class="panel-actions">
-                        <button class="panel-action">View All</button>
-                    </div>
                 </div>
-                <div class="active-sessions">
-                    {{range .ActiveLists}}
-                    <a href="/lists/{{.SessionID}}" class="active-session-card">
-                        <div class="session-status-bar"></div>
-                        <div class="session-content">
-                            <div class="session-header">
-                                <span class="session-task-count">{{.TaskCount}} tasks</span>
-                                <span class="session-time">now</span>
-                            </div>
-                            {{if .ProjectName}}
-                            <div class="session-project">{{.ProjectName}}</div>
-                            {{end}}
-                            <div class="session-id">{{.SessionID}}</div>
-                            <div class="session-progress">
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: 33%"></div>
+                <div id="active-sessions-content"
+                     hx-get="/partials/active-sessions"
+                     hx-trigger="load, every 10s"
+                     hx-swap="innerHTML"
+                     hx-indicator="#global-loader">
+                    {{if .ActiveLists}}
+                    <div class="active-sessions">
+                        {{range .ActiveLists}}
+                        <a href="/lists/{{.SessionID}}" class="active-session-card">
+                            <div class="session-status-bar"></div>
+                            <div class="session-content">
+                                <div class="session-header">
+                                    <span class="session-task-count">{{.TaskCount}} tasks</span>
+                                    <span class="session-time">now</span>
                                 </div>
-                                <span class="progress-text">In Progress</span>
+                                {{if .ProjectName}}
+                                <div class="session-project">{{.ProjectName}}</div>
+                                {{end}}
+                                {{if .Summary}}
+                                <div class="session-summary">{{truncate .Summary 80}}</div>
+                                {{else if isValidPrompt .FirstPrompt}}
+                                <div class="session-summary">{{truncate .FirstPrompt 80}}</div>
+                                {{end}}
+                                <div class="session-id">{{truncateID .SessionID 8}}</div>
+                                <div class="session-progress">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 33%"></div>
+                                    </div>
+                                    <span class="progress-text">In Progress</span>
+                                </div>
                             </div>
-                        </div>
-                        <div class="session-action">
-                            <svg viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M6 3l5 5-5 5V3z"/>
-                            </svg>
-                        </div>
-                    </a>
+                            <div class="session-action">
+                                <svg viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M6 3l5 5-5 5V3z"/>
+                                </svg>
+                            </div>
+                        </a>
+                        {{end}}
+                    </div>
+                    {{else}}
+                    <div class="instances-empty">
+                        <p>No active sessions with tasks</p>
+                    </div>
                     {{end}}
                 </div>
             </section>
-            {{end}}
 
             <!-- Projects Grid -->
             <section class="panel" id="projects">
                 <div class="panel-header">
                     <div class="panel-title">Projects</div>
-                    <div class="panel-tabs">
-                        <button class="panel-tab active">All</button>
-                        <button class="panel-tab">Recent</button>
-                        <button class="panel-tab">Starred</button>
-                    </div>
                 </div>
 
                 {{if .Groups}}
@@ -203,18 +213,6 @@
                                         <span class="meta-item">{{len .Projects}} worktree{{if gt (len .Projects) 1}}s{{end}}</span>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="project-row-actions">
-                                <button class="icon-btn" title="Star project">
-                                    <svg viewBox="0 0 16 16" fill="currentColor">
-                                        <path d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"/>
-                                    </svg>
-                                </button>
-                                <button class="icon-btn expand-btn" title="Expand">
-                                    <svg viewBox="0 0 16 16" fill="currentColor">
-                                        <path d="M4 6l4 4 4-4H4z"/>
-                                    </svg>
-                                </button>
                             </div>
                         </div>
                         <div class="project-worktrees">
@@ -324,26 +322,11 @@
 
     // Keyboard navigation
     document.addEventListener('keydown', (e) => {
-        // Cmd/Ctrl + K for command palette
-        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-            e.preventDefault();
-            // Focus search as command palette alternative.
-            searchInput?.focus();
-        }
         // / to focus search
         if (e.key === '/' && !e.target.matches('input, textarea')) {
             e.preventDefault();
             searchInput?.focus();
         }
-    });
-
-    // Expand/collapse project rows
-    document.querySelectorAll('.expand-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const row = btn.closest('.project-row');
-            row.classList.toggle('expanded');
-        });
     });
     </script>
 </body>

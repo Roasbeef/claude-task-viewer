@@ -1,0 +1,218 @@
+{{define "all_tasks.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} | Claude Task Viewer</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/htmx.min.js"></script>
+</head>
+<body class="app-layout" hx-boost="true">
+    <!-- Global loading indicator -->
+    <div id="global-loader" class="htmx-indicator"></div>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <a href="/" class="sidebar-brand">
+                <span class="brand-icon"></span>
+                <span class="brand-text">Task Archive</span>
+            </a>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <a href="/" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0L0 6v10h6V9h4v7h6V6L8 0z"/>
+                    </svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/tasks" class="nav-item active">
+                    <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M2 2h12v2H2V2zm0 4h12v2H2V6zm0 4h8v2H2v-2z"/>
+                    </svg>
+                    <span>All Tasks</span>
+                    <span class="nav-badge">{{.TotalCount}}</span>
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Status</div>
+                <div class="nav-stats">
+                    <div class="nav-stat">
+                        <span class="stat-dot pending"></span>
+                        <span class="stat-label">Pending</span>
+                        <span class="stat-value">{{.PendingCount}}</span>
+                    </div>
+                    <div class="nav-stat">
+                        <span class="stat-dot progress"></span>
+                        <span class="stat-label">In Progress</span>
+                        <span class="stat-value">{{.InProgressCount}}</span>
+                    </div>
+                    <div class="nav-stat">
+                        <span class="stat-dot completed"></span>
+                        <span class="stat-label">Completed</span>
+                        <span class="stat-value">{{.CompletedCount}}</span>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="keyboard-hints">
+                <div class="hint"><kbd>Esc</kbd> Dashboard</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <header class="topbar">
+            <div class="topbar-left">
+                <a href="/" class="back-btn" title="Back to dashboard">
+                    <svg viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M10 3L5 8l5 5V3z"/>
+                    </svg>
+                </a>
+                <h1 class="page-title">All Tasks</h1>
+            </div>
+            <div class="topbar-center">
+                <div class="filter-tabs" role="tablist">
+                    <button class="filter-tab {{if eq .Filter "active"}}active{{end}}"
+                            hx-get="/tasks?filter=active"
+                            hx-target="#tasks-content"
+                            hx-swap="innerHTML"
+                            hx-push-url="true"
+                            hx-indicator="#global-loader">
+                        Active <span class="filter-count">{{.ActiveCount}}</span>
+                    </button>
+                    <button class="filter-tab {{if eq .Filter "pending"}}active{{end}}"
+                            hx-get="/tasks?filter=pending"
+                            hx-target="#tasks-content"
+                            hx-swap="innerHTML"
+                            hx-push-url="true"
+                            hx-indicator="#global-loader">
+                        Pending <span class="filter-count">{{.PendingCount}}</span>
+                    </button>
+                    <button class="filter-tab {{if eq .Filter "in_progress"}}active{{end}}"
+                            hx-get="/tasks?filter=in_progress"
+                            hx-target="#tasks-content"
+                            hx-swap="innerHTML"
+                            hx-push-url="true"
+                            hx-indicator="#global-loader">
+                        In Progress <span class="filter-count">{{.InProgressCount}}</span>
+                    </button>
+                    <button class="filter-tab {{if eq .Filter "completed"}}active{{end}}"
+                            hx-get="/tasks?filter=completed"
+                            hx-target="#tasks-content"
+                            hx-swap="innerHTML"
+                            hx-push-url="true"
+                            hx-indicator="#global-loader">
+                        Completed <span class="filter-count">{{.CompletedCount}}</span>
+                    </button>
+                    <button class="filter-tab {{if eq .Filter "all"}}active{{end}}"
+                            hx-get="/tasks?filter=all"
+                            hx-target="#tasks-content"
+                            hx-swap="innerHTML"
+                            hx-push-url="true"
+                            hx-indicator="#global-loader">
+                        All <span class="filter-count">{{.TotalCount}}</span>
+                    </button>
+                </div>
+            </div>
+            <div class="topbar-right">
+            </div>
+        </header>
+
+        <div id="tasks-content" class="dashboard all-tasks-view">
+            {{template "all_tasks_content.html" .}}
+        </div>
+    </main>
+
+    <script>
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            window.location.href = '/';
+        }
+    });
+
+    // Update active filter tab after HTMX swap.
+    document.body.addEventListener('htmx:afterSwap', (e) => {
+        if (e.detail.target.id === 'tasks-content') {
+            const url = new URL(window.location);
+            const filter = url.searchParams.get('filter') || 'active';
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.getAttribute('hx-get').includes('filter=' + filter)) {
+                    tab.classList.add('active');
+                }
+            });
+        }
+    });
+    </script>
+</body>
+</html>
+{{end}}
+
+{{define "all_tasks_content.html"}}
+{{if .TasksBySession}}
+{{range $session := .TasksBySession}}
+<section class="panel session-tasks-panel">
+    <div class="panel-header">
+        <div class="panel-title">
+            {{if $session.ProjectName}}
+            <span class="session-project-name">{{$session.ProjectName}}</span>
+            <span class="panel-sep">/</span>
+            {{end}}
+            <a href="/lists/{{$session.SessionID}}" class="session-link">{{truncateID $session.SessionID 8}}</a>
+        </div>
+        {{if $session.Summary}}
+        <div class="panel-subtitle">{{truncate $session.Summary 60}}</div>
+        {{end}}
+    </div>
+
+    <div class="tasks-grid">
+        {{range $session.Tasks}}
+        <a href="/lists/{{$session.SessionID}}/tasks/{{.ID}}" class="task-card {{.Status}} {{if isBlocked .}}blocked{{end}}">
+            <div class="task-card-header">
+                <span class="task-status-dot {{.Status}}"></span>
+                <span class="task-id">#{{.ID}}</span>
+                {{if isBlocked .}}
+                <span class="task-blocked-icon" title="Blocked">
+                    <svg viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 1a4 4 0 00-4 4v2H3a1 1 0 00-1 1v6a1 1 0 001 1h10a1 1 0 001-1V8a1 1 0 00-1-1h-1V5a4 4 0 00-4-4zm2 6H6V5a2 2 0 114 0v2z"/>
+                    </svg>
+                </span>
+                {{end}}
+            </div>
+            <div class="task-subject">{{.Subject}}</div>
+            {{if .Description}}
+            <div class="task-description">{{truncate .Description 100}}</div>
+            {{end}}
+            <div class="task-meta">
+                {{if .Owner}}
+                <span class="task-owner">{{.Owner}}</span>
+                {{end}}
+                {{if .BlockedBy}}
+                <span class="task-deps">{{len .BlockedBy}} blocker{{if gt (len .BlockedBy) 1}}s{{end}}</span>
+                {{end}}
+            </div>
+        </a>
+        {{end}}
+    </div>
+</section>
+{{end}}
+{{else}}
+<div class="empty-state">
+    <div class="empty-icon">
+        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="8" y="8" width="32" height="32" rx="4"/>
+            <path d="M16 20h16M16 28h10"/>
+        </svg>
+    </div>
+    <h3>No tasks match this filter</h3>
+    <p>Try selecting a different filter above.</p>
+</div>
+{{end}}
+{{end}}

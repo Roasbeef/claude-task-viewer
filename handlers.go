@@ -20,8 +20,9 @@ type PageData struct {
 // IndexData holds data for the index page.
 type IndexData struct {
 	PageData
-	Groups      []ProjectGroup
-	ActiveLists []ActiveTaskList
+	Groups         []ProjectGroup
+	ActiveLists    []ActiveTaskList
+	TotalTaskCount int
 }
 
 // ListSummary summarizes a task list.
@@ -36,8 +37,9 @@ type ListSummary struct {
 // ProjectViewData holds data for the project view.
 type ProjectViewData struct {
 	PageData
-	Project  Project
-	Sessions []SessionViewEntry
+	Project            Project
+	Sessions           []SessionViewEntry
+	SessionsWithTasks  int
 }
 
 // SessionViewEntry extends SessionEntry with task info.
@@ -64,6 +66,26 @@ type TaskDetailData struct {
 	Task     *claudeagent.TaskListItem
 	Blockers []claudeagent.TaskListItem
 	Blocking []claudeagent.TaskListItem
+}
+
+// AllTasksData holds data for the unified tasks view.
+type AllTasksData struct {
+	PageData
+	TasksBySession  []SessionTasks
+	Filter          string
+	TotalCount      int
+	PendingCount    int
+	InProgressCount int
+	CompletedCount  int
+	ActiveCount     int
+}
+
+// SessionTasks holds tasks grouped by session.
+type SessionTasks struct {
+	SessionID   string
+	ProjectName string
+	Summary     string
+	Tasks       []claudeagent.TaskListItem
 }
 
 // GraphData holds data for the dependency graph API.
@@ -102,13 +124,134 @@ func (h *HTTPServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 	// Get active task lists (sessions with actual task files).
 	activeLists, _ := h.projectIndexer.ListActiveTaskLists()
 
+	// Compute total task count.
+	totalTaskCount := 0
+	for _, al := range activeLists {
+		totalTaskCount += al.TaskCount
+	}
+
 	data := IndexData{
-		PageData:    PageData{Title: "Task Viewer"},
-		Groups:      groups,
-		ActiveLists: activeLists,
+		PageData:       PageData{Title: "Task Viewer"},
+		Groups:         groups,
+		ActiveLists:    activeLists,
+		TotalTaskCount: totalTaskCount,
 	}
 
 	h.render(w, "index.html", data)
+}
+
+// handleAllTasks renders a unified view of all tasks across all active sessions.
+func (h *HTTPServer) handleAllTasks(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get filter from query param, default to "active".
+	filter := r.URL.Query().Get("filter")
+	if filter == "" {
+		filter = "active"
+	}
+
+	// Get all active task lists.
+	activeLists, err := h.projectIndexer.ListActiveTaskLists()
+	if err != nil {
+		h.renderError(
+			w, "Failed to list active sessions: "+err.Error(),
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	var (
+		tasksBySession                             []SessionTasks
+		totalCount, pendingCount, inProgressCount  int
+		completedCount                             int
+	)
+
+	// Load tasks from each active session.
+	for _, active := range activeLists {
+		tasks, err := h.taskStore.List(ctx, active.SessionID)
+		if err != nil {
+			continue
+		}
+
+		if len(tasks) == 0 {
+			continue
+		}
+
+		// Count all tasks by status (for sidebar stats).
+		for _, t := range tasks {
+			totalCount++
+			switch t.Status {
+			case "pending":
+				pendingCount++
+
+			case "in_progress":
+				inProgressCount++
+
+			case "completed":
+				completedCount++
+			}
+		}
+
+		// Filter tasks based on filter param.
+		var filtered []claudeagent.TaskListItem
+		for _, t := range tasks {
+			include := false
+			switch filter {
+			case "all":
+				include = true
+
+			case "active":
+				include = t.Status == "pending" || t.Status == "in_progress"
+
+			case "pending":
+				include = t.Status == "pending"
+
+			case "in_progress":
+				include = t.Status == "in_progress"
+
+			case "completed":
+				include = t.Status == "completed"
+
+			default:
+				include = t.Status == "pending" || t.Status == "in_progress"
+			}
+			if include {
+				filtered = append(filtered, t)
+			}
+		}
+
+		// Only add session if it has tasks after filtering.
+		if len(filtered) > 0 {
+			st := SessionTasks{
+				SessionID:   active.SessionID,
+				ProjectName: active.ProjectName,
+				Summary:     active.Summary,
+				Tasks:       filtered,
+			}
+			tasksBySession = append(tasksBySession, st)
+		}
+	}
+
+	activeCount := pendingCount + inProgressCount
+
+	data := AllTasksData{
+		PageData:        PageData{Title: "All Tasks"},
+		TasksBySession:  tasksBySession,
+		Filter:          filter,
+		TotalCount:      totalCount,
+		PendingCount:    pendingCount,
+		InProgressCount: inProgressCount,
+		CompletedCount:  completedCount,
+		ActiveCount:     activeCount,
+	}
+
+	// Check if this is an HTMX request for partial content.
+	if r.Header.Get("HX-Request") == "true" {
+		h.render(w, "all_tasks_content.html", data)
+		return
+	}
+
+	h.render(w, "all_tasks.html", data)
 }
 
 // handleProjectView renders a project with its sessions.
@@ -123,12 +266,17 @@ func (h *HTTPServer) handleProjectView(w http.ResponseWriter, r *http.Request) {
 
 	// Build session view entries with task counts.
 	sessions := make([]SessionViewEntry, len(project.Sessions))
+	sessionsWithTasks := 0
 	for i, s := range project.Sessions {
 		taskCount := h.projectIndexer.GetTaskCount(s.SessionID)
+		hasTasks := taskCount > 0
 		sessions[i] = SessionViewEntry{
 			SessionEntry: s,
 			TaskCount:    taskCount,
-			HasTasks:     taskCount > 0,
+			HasTasks:     hasTasks,
+		}
+		if hasTasks {
+			sessionsWithTasks++
 		}
 	}
 
@@ -137,8 +285,9 @@ func (h *HTTPServer) handleProjectView(w http.ResponseWriter, r *http.Request) {
 			Title:  project.Name,
 			ListID: dirName,
 		},
-		Project:  project,
-		Sessions: sessions,
+		Project:           project,
+		Sessions:          sessions,
+		SessionsWithTasks: sessionsWithTasks,
 	}
 
 	h.render(w, "project.html", data)
@@ -404,4 +553,201 @@ func (h *HTTPServer) renderError(w http.ResponseWriter, msg string, code int) {
 		Error: msg,
 	}
 	h.render(w, "error.html", data)
+}
+
+// InstancesData holds data for the instances panel.
+type InstancesData struct {
+	Instances []ClaudeInstance
+	Count     int
+}
+
+// handleInstancesPartial renders the running instances panel for HTMX.
+func (h *HTTPServer) handleInstancesPartial(w http.ResponseWriter, r *http.Request) {
+	instances, err := h.instanceTracker.ListRunningInstances()
+	if err != nil {
+		h.log.Warnf("Failed to list instances: %v", err)
+		instances = nil
+	}
+
+	data := InstancesData{
+		Instances: instances,
+		Count:     len(instances),
+	}
+
+	h.render(w, "instances_panel.html", data)
+}
+
+// handleInstancesAPI returns running instances as JSON.
+func (h *HTTPServer) handleInstancesAPI(w http.ResponseWriter, r *http.Request) {
+	instances, err := h.instanceTracker.ListRunningInstances()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if instances == nil {
+		instances = []ClaudeInstance{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(instances)
+}
+
+// handleActiveSessionsPartial renders the active sessions panel for HTMX.
+func (h *HTTPServer) handleActiveSessionsPartial(
+	w http.ResponseWriter, r *http.Request,
+) {
+	activeLists, _ := h.projectIndexer.ListActiveTaskLists()
+
+	totalTaskCount := 0
+	for _, al := range activeLists {
+		totalTaskCount += al.TaskCount
+	}
+
+	data := struct {
+		ActiveLists    []ActiveTaskList
+		TotalTaskCount int
+	}{
+		ActiveLists:    activeLists,
+		TotalTaskCount: totalTaskCount,
+	}
+
+	h.render(w, "active_sessions_panel.html", data)
+}
+
+// handleSessionsPartial renders paginated sessions for a project.
+func (h *HTTPServer) handleSessionsPartial(
+	w http.ResponseWriter, r *http.Request,
+) {
+	projectID := r.PathValue("projectID")
+
+	// Parse offset parameter for pagination.
+	offset := 0
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		fmt.Sscanf(offsetStr, "%d", &offset)
+	}
+
+	// Parse limit parameter (default 10).
+	limit := 10
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		fmt.Sscanf(limitStr, "%d", &limit)
+	}
+
+	project, err := h.projectIndexer.GetProject(projectID)
+	if err != nil {
+		http.Error(w, "Project not found", http.StatusNotFound)
+		return
+	}
+
+	// Apply pagination to sessions.
+	totalSessions := len(project.Sessions)
+	start := offset
+	if start > totalSessions {
+		start = totalSessions
+	}
+	end := start + limit
+	if end > totalSessions {
+		end = totalSessions
+	}
+
+	sessions := make([]SessionViewEntry, 0, end-start)
+	for i := start; i < end; i++ {
+		s := project.Sessions[i]
+		taskCount := h.projectIndexer.GetTaskCount(s.SessionID)
+		sessions = append(sessions, SessionViewEntry{
+			SessionEntry: s,
+			TaskCount:    taskCount,
+			HasTasks:     taskCount > 0,
+		})
+	}
+
+	data := struct {
+		Sessions    []SessionViewEntry
+		HasMore     bool
+		NextOffset  int
+		ProjectID   string
+		TotalCount  int
+	}{
+		Sessions:   sessions,
+		HasMore:    end < totalSessions,
+		NextOffset: end,
+		ProjectID:  projectID,
+		TotalCount: totalSessions,
+	}
+
+	h.render(w, "sessions_partial.html", data)
+}
+
+// handleProjectGroupPartial renders a single project group for lazy loading.
+func (h *HTTPServer) handleProjectGroupPartial(
+	w http.ResponseWriter, r *http.Request,
+) {
+	baseRepo := r.PathValue("baseRepo")
+
+	groups, err := h.projectIndexer.ListProjectGroups()
+	if err != nil {
+		http.Error(w, "Failed to list projects", http.StatusInternalServerError)
+		return
+	}
+
+	// Find the matching group.
+	var targetGroup *ProjectGroup
+	for i := range groups {
+		if groups[i].BaseRepo == baseRepo {
+			targetGroup = &groups[i]
+			break
+		}
+	}
+
+	if targetGroup == nil {
+		http.Error(w, "Project group not found", http.StatusNotFound)
+		return
+	}
+
+	h.render(w, "project_group_partial.html", targetGroup)
+}
+
+// TaskCountsData holds count data for OOB updates.
+type TaskCountsData struct {
+	ListID          string
+	PendingCount    int
+	InProgressCount int
+	CompletedCount  int
+	TotalCount      int
+}
+
+// handleTaskCountsPartial returns OOB updates for task counts.
+func (h *HTTPServer) handleTaskCountsPartial(
+	w http.ResponseWriter, r *http.Request,
+) {
+	ctx := r.Context()
+	listID := r.PathValue("listID")
+
+	tasks, err := h.taskStore.List(ctx, listID)
+	if err != nil {
+		http.Error(w, "Failed to load tasks", http.StatusInternalServerError)
+		return
+	}
+
+	var pendingCount, inProgressCount, completedCount int
+	for _, t := range tasks {
+		switch t.Status {
+		case "pending":
+			pendingCount++
+		case "in_progress":
+			inProgressCount++
+		case "completed":
+			completedCount++
+		}
+	}
+
+	data := TaskCountsData{
+		ListID:          listID,
+		PendingCount:    pendingCount,
+		InProgressCount: inProgressCount,
+		CompletedCount:  completedCount,
+		TotalCount:      len(tasks),
+	}
+
+	h.render(w, "task_counts_oob.html", data)
 }

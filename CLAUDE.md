@@ -51,26 +51,51 @@ Server runs at http://localhost:8080
 
 | Route | Description |
 |-------|-------------|
-| `/` | Project list |
+| `/` | Dashboard with projects and active sessions |
+| `/tasks` | All tasks across all active sessions |
 | `/projects/{projectID}` | Project sessions |
-| `/lists/{listID}` | Task list |
+| `/lists/{listID}` | Task list (Kanban board) |
 | `/lists/{listID}/tasks/{taskID}` | Task detail |
 | `/lists/{listID}/graph` | Dependency graph |
 
-## Development
+## Testing Flow After Adding Features
+
+After implementing any UI feature, always verify it works:
+
+1. **Rebuild and restart**:
+   ```bash
+   make restart
+   ```
+
+2. **Test the endpoint with curl** (quick sanity check):
+   ```bash
+   # Check page loads
+   curl -s http://localhost:8080/tasks | head -50
+
+   # Verify specific elements render
+   curl -s http://localhost:8080/tasks | grep -c 'task-card'
+   ```
+
+3. **Visual verification** - Open http://localhost:8080 in browser and:
+   - Click through all new UI elements
+   - Verify links work
+   - Check styling looks correct
+   - Test on different data states (empty, one item, many items)
+
+4. **Template gotchas to watch for**:
+   - `{{$.Foo}}` in nested `{{range}}` refers to ROOT data, not parent
+   - Use `{{range $item := .Items}}` then `{{$item.Field}}` for nested access
+   - Template errors may render partial HTML - always check output
+
+## Make Commands
 
 ```bash
-# Rebuild and restart
-make restart
-
-# View running process
-make logs
-
-# Format code
-make fmt
-
-# Run tests
-make test
+make dev       # Build and start server
+make restart   # Rebuild and restart after changes
+make stop      # Stop server
+make logs      # View running process
+make fmt       # Format code
+make test      # Run tests
 ```
 
 ## Dependencies

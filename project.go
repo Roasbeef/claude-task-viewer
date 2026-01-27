@@ -241,6 +241,8 @@ type ActiveTaskList struct {
 	TaskDir     string
 	ProjectName string
 	ProjectPath string
+	Summary     string
+	FirstPrompt string
 }
 
 // ListActiveTaskLists returns all task lists that have actual task files.
@@ -272,6 +274,14 @@ func (pi *ProjectIndexer) ListActiveTaskLists() ([]ActiveTaskList, error) {
 			if proj, ok := sessionToProject[sessionID]; ok {
 				active.ProjectName = proj.name
 				active.ProjectPath = proj.path
+				active.Summary = proj.summary
+				active.FirstPrompt = proj.firstPrompt
+			} else if proj, ok := pi.findProjectByJSONL(sessionID); ok {
+				// Fallback: search for the JSONL file directly.
+				active.ProjectName = proj.name
+				active.ProjectPath = proj.path
+				active.Summary = proj.summary
+				active.FirstPrompt = proj.firstPrompt
 			}
 
 			activeLists = append(activeLists, active)
@@ -283,8 +293,10 @@ func (pi *ProjectIndexer) ListActiveTaskLists() ([]ActiveTaskList, error) {
 
 // projectInfo holds minimal project info for session lookups.
 type projectInfo struct {
-	name string
-	path string
+	name        string
+	path        string
+	summary     string
+	firstPrompt string
 }
 
 // buildSessionProjectMap scans all projects and builds a map of session IDs
@@ -320,8 +332,10 @@ func (pi *ProjectIndexer) buildSessionProjectMap() map[string]projectInfo {
 
 		for _, entry := range index.Entries {
 			result[entry.SessionID] = projectInfo{
-				name: projectName,
-				path: dir.Name(),
+				name:        projectName,
+				path:        dir.Name(),
+				summary:     entry.Summary,
+				firstPrompt: entry.FirstPrompt,
 			}
 		}
 	}
@@ -342,6 +356,32 @@ func extractProjectName(dirName string) string {
 		}
 	}
 	return dirName
+}
+
+// findProjectByJSONL searches for a session's JSONL file in project directories.
+// This is a fallback when the session isn't in sessions-index.json yet.
+func (pi *ProjectIndexer) findProjectByJSONL(sessionID string) (projectInfo, bool) {
+	projectDirs, err := os.ReadDir(pi.projectsDir)
+	if err != nil {
+		return projectInfo{}, false
+	}
+
+	jsonlName := sessionID + ".jsonl"
+	for _, dir := range projectDirs {
+		if !dir.IsDir() {
+			continue
+		}
+
+		jsonlPath := filepath.Join(pi.projectsDir, dir.Name(), jsonlName)
+		if _, err := os.Stat(jsonlPath); err == nil {
+			return projectInfo{
+				name: extractProjectName(dir.Name()),
+				path: dir.Name(),
+			}, true
+		}
+	}
+
+	return projectInfo{}, false
 }
 
 // ProjectSummary provides a condensed view of a project for listing.

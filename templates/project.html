@@ -8,7 +8,9 @@
     <link rel="stylesheet" href="/static/style.css">
     <script src="/static/htmx.min.js"></script>
 </head>
-<body class="app-layout">
+<body class="app-layout" hx-boost="true">
+    <!-- Global loading indicator -->
+    <div id="global-loader" class="htmx-indicator"></div>
     <!-- Sidebar -->
     <aside class="sidebar">
         <div class="sidebar-header">
@@ -80,7 +82,7 @@
                 <div class="metric-card">
                     <div class="metric-icon tasks"></div>
                     <div class="metric-content">
-                        <div class="metric-value">{{range .Sessions}}{{if .HasTasks}}+{{end}}{{end}}0</div>
+                        <div class="metric-value">{{.SessionsWithTasks}}</div>
                         <div class="metric-label">With Tasks</div>
                     </div>
                 </div>
@@ -103,14 +105,16 @@
                             <div class="session-info">
                                 {{if .Summary}}
                                 <h3 class="session-title">{{.Summary}}</h3>
+                                {{else if .FirstPrompt}}
+                                <h3 class="session-title">{{truncate .FirstPrompt 60}}</h3>
                                 {{else}}
-                                <h3 class="session-title">Session</h3>
+                                <h3 class="session-title">Session {{truncateID .SessionID 8}}</h3>
                                 {{end}}
                                 <span class="session-id-badge">{{truncateID .SessionID 12}}</span>
                             </div>
                             {{if .GitBranch}}
                             <span class="session-branch-badge">
-                                <svg viewBox="0 0 16 16" fill="currentColor" style="width:12px;height:12px">
+                                <svg viewBox="0 0 16 16" fill="currentColor">
                                     <path d="M11.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122V6A2.5 2.5 0 0110 8.5H6a1 1 0 00-1 1v1.128a2.251 2.251 0 11-1.5 0V5.372a2.25 2.25 0 111.5 0v1.836A2.492 2.492 0 016 7h4a1 1 0 001-1v-.628A2.25 2.25 0 019.5 3.25zM4.25 12a.75.75 0 100 1.5.75.75 0 000-1.5zM3.5 3.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0z"/>
                                 </svg>
                                 {{.GitBranch}}
@@ -118,48 +122,32 @@
                             {{end}}
                         </div>
 
-                        {{if .FirstPrompt}}
-                        <p class="session-prompt">{{truncate .FirstPrompt 180}}</p>
+                        {{if and (isValidPrompt .FirstPrompt) .Summary}}
+                        <p class="session-prompt">{{truncate .FirstPrompt 150}}</p>
                         {{end}}
 
                         <div class="session-meta-row">
                             {{if .MessageCount}}
                             <span class="session-meta-item">
-                                <svg viewBox="0 0 16 16" fill="currentColor" style="width:12px;height:12px">
-                                    <path d="M2 2h12v9H5l-3 3V2z"/>
-                                </svg>
+                                <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h12v9H5l-3 3V2z"/></svg>
                                 {{.MessageCount}} messages
                             </span>
                             {{end}}
                             {{if .HasTasks}}
                             <span class="session-meta-item has-tasks">
-                                <svg viewBox="0 0 16 16" fill="currentColor" style="width:12px;height:12px">
-                                    <path d="M2 2h12v2H2V2zm0 4h12v2H2V6zm0 4h8v2H2v-2z"/>
-                                </svg>
+                                <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h12v2H2V2zm0 4h12v2H2V6zm0 4h8v2H2v-2z"/></svg>
                                 {{.TaskCount}} tasks
                             </span>
                             {{end}}
                             {{if not .Modified.IsZero}}
-                            <span class="session-meta-item session-time">
-                                {{formatTime .Modified}}
-                            </span>
+                            <span class="session-meta-item session-time">{{formatTime .Modified}}</span>
                             {{end}}
                         </div>
 
                         {{if .HasTasks}}
                         <div class="session-actions">
-                            <a href="/lists/{{.SessionID}}" class="btn btn-secondary btn-sm">
-                                <svg viewBox="0 0 16 16" fill="currentColor" style="width:12px;height:12px">
-                                    <path d="M2 2h12v2H2V2zm0 4h12v2H2V6zm0 4h8v2H2v-2z"/>
-                                </svg>
-                                View Tasks
-                            </a>
-                            <a href="/lists/{{.SessionID}}/graph" class="btn btn-secondary btn-sm">
-                                <svg viewBox="0 0 16 16" fill="currentColor" style="width:12px;height:12px">
-                                    <path d="M4 3a2 2 0 100 4 2 2 0 000-4zm8 2a2 2 0 100 4 2 2 0 000-4zm-4 6a2 2 0 100 4 2 2 0 000-4z"/>
-                                </svg>
-                                Graph
-                            </a>
+                            <a href="/lists/{{.SessionID}}" class="btn btn-secondary btn-sm"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h12v2H2V2zm0 4h12v2H2V6zm0 4h8v2H2v-2z"/></svg> View Tasks</a>
+                            <a href="/lists/{{.SessionID}}/graph" class="btn btn-secondary btn-sm"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 3a2 2 0 100 4 2 2 0 000-4zm8 2a2 2 0 100 4 2 2 0 000-4zm-4 6a2 2 0 100 4 2 2 0 000-4z"/></svg> Graph</a>
                         </div>
                         {{end}}
                     </div>

@@ -1,0 +1,41 @@
+{{define "active_sessions_panel.html"}}
+{{if .ActiveLists}}
+<div class="active-sessions">
+    {{range .ActiveLists}}
+    <a href="/lists/{{.SessionID}}" class="active-session-card">
+        <div class="session-status-bar"></div>
+        <div class="session-content">
+            <div class="session-header">
+                <span class="session-task-count">{{.TaskCount}} tasks</span>
+                <span class="session-time">now</span>
+            </div>
+            {{if .ProjectName}}
+            <div class="session-project">{{.ProjectName}}</div>
+            {{end}}
+            {{if .Summary}}
+            <div class="session-summary">{{truncate .Summary 80}}</div>
+            {{else if isValidPrompt .FirstPrompt}}
+            <div class="session-summary">{{truncate .FirstPrompt 80}}</div>
+            {{end}}
+            <div class="session-id">{{truncateID .SessionID 8}}</div>
+            <div class="session-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 33%"></div>
+                </div>
+                <span class="progress-text">In Progress</span>
+            </div>
+        </div>
+        <div class="session-action">
+            <svg viewBox="0 0 16 16" fill="currentColor">
+                <path d="M6 3l5 5-5 5V3z"/>
+            </svg>
+        </div>
+    </a>
+    {{end}}
+</div>
+{{else}}
+<div class="instances-empty">
+    <p>No active sessions with tasks</p>
+</div>
+{{end}}
+{{end}}

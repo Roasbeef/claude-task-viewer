@@ -1,0 +1,9 @@
+{{define "task_counts_oob.html"}}
+<!-- OOB updates for task counts - used with hx-swap-oob -->
+<span id="col-pending-count" hx-swap-oob="true" class="column-count">{{.PendingCount}}</span>
+<span id="col-inprogress-count" hx-swap-oob="true" class="column-count">{{.InProgressCount}}</span>
+<span id="col-completed-count" hx-swap-oob="true" class="column-count">{{.CompletedCount}}</span>
+<span id="sidebar-pending-count" hx-swap-oob="true" class="stat-value">{{.PendingCount}}</span>
+<span id="sidebar-inprogress-count" hx-swap-oob="true" class="stat-value">{{.InProgressCount}}</span>
+<span id="sidebar-completed-count" hx-swap-oob="true" class="stat-value">{{.CompletedCount}}</span>
+{{end}}

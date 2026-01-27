@@ -8,7 +8,9 @@
     <link rel="stylesheet" href="/static/style.css">
     <script src="/static/htmx.min.js"></script>
 </head>
-<body class="app-layout">
+<body class="app-layout" hx-boost="true">
+    <!-- Global loading indicator -->
+    <div id="global-loader" class="htmx-indicator"></div>
     <!-- Sidebar -->
     <aside class="sidebar">
         <div class="sidebar-header">
@@ -135,8 +137,8 @@
                 <div class="panel-header">
                     <div class="panel-title">Description</div>
                 </div>
-                <div class="task-description-content">
-                    <pre class="task-description-text">{{.Task.Description}}</pre>
+                <div class="task-description-content markdown-body">
+                    {{renderMarkdown .Task.Description}}
                 </div>
             </section>
             {{end}}
