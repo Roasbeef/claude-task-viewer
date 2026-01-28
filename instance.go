@@ -87,19 +87,27 @@ func (it *InstanceTracker) findClaudePIDsFallback() ([]int, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(output))
 	for scanner.Scan() {
 		line := scanner.Text()
-		// Look for claude CLI processes. The command column typically shows
-		// just "claude" or "claude --flags".
-		fields := strings.Fields(line)
-		if len(fields) >= 11 {
-			// Command is typically in field 10+ (after USER PID %CPU etc).
-			cmdPart := strings.Join(fields[10:], " ")
-			if (strings.HasPrefix(cmdPart, "claude ") ||
-				cmdPart == "claude") &&
-				!strings.Contains(line, "grep") {
+		if strings.Contains(line, "grep") {
+			continue
+		}
 
-				if pid, err := strconv.Atoi(fields[1]); err == nil {
-					pids = append(pids, pid)
-				}
+		fields := strings.Fields(line)
+		if len(fields) < 11 {
+			continue
+		}
+
+		// Command is typically in field 10+ (after USER PID %CPU etc).
+		cmdPart := strings.Join(fields[10:], " ")
+
+		// Match: "claude", "claude --flags", or version-managed path.
+		isClaudeCmd := strings.HasPrefix(cmdPart, "claude ") ||
+			cmdPart == "claude"
+		isClaudePath := strings.Contains(cmdPart, ".local/share/claude") ||
+			strings.Contains(cmdPart, "claude/versions")
+
+		if isClaudeCmd || isClaudePath {
+			if pid, err := strconv.Atoi(fields[1]); err == nil {
+				pids = append(pids, pid)
 			}
 		}
 	}

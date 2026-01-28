@@ -83,13 +83,18 @@
         <div class="dashboard">
             <!-- Running Instances Panel -->
             <section class="panel instances-panel" id="instances">
-                <div class="panel-header">
+                <div class="panel-header collapsible" onclick="togglePanel('instances')">
                     <div class="panel-title">
                         <span class="live-indicator"></span>
                         Running Instances
                     </div>
+                    <button class="panel-toggle" aria-label="Toggle panel" onclick="event.stopPropagation(); togglePanel('instances')">
+                        <svg class="toggle-icon" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M4 6l4 4 4-4H4z"/>
+                        </svg>
+                    </button>
                 </div>
-                <div id="instances-content"
+                <div id="instances-content" class="panel-content"
                      hx-get="/partials/instances"
                      hx-trigger="load, every 5s"
                      hx-swap="innerHTML"
@@ -327,6 +332,26 @@
             e.preventDefault();
             searchInput?.focus();
         }
+    });
+
+    // Panel collapse/expand functionality
+    function togglePanel(panelId) {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+        panel.classList.toggle('collapsed');
+        // Persist collapse state in localStorage.
+        const collapsed = panel.classList.contains('collapsed');
+        localStorage.setItem(`panel-${panelId}-collapsed`, collapsed);
+    }
+
+    // Restore collapsed state from localStorage on load.
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.panel[id]').forEach(panel => {
+            const collapsed = localStorage.getItem(`panel-${panel.id}-collapsed`) === 'true';
+            if (collapsed) {
+                panel.classList.add('collapsed');
+            }
+        });
     });
     </script>
 </body>

@@ -668,6 +668,56 @@ kbd {
     position: relative;
 }
 
+.panel-header.collapsible {
+    cursor: pointer;
+    user-select: none;
+}
+
+.panel-header.collapsible:hover {
+    background: var(--parchment-200);
+}
+
+.panel-toggle {
+    background: none;
+    border: none;
+    padding: var(--space-2);
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: transform 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.panel-toggle:hover {
+    color: var(--text-primary);
+}
+
+.toggle-icon {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.2s ease;
+}
+
+.panel.collapsed .toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.panel-content {
+    transition: max-height 0.3s ease, opacity 0.2s ease;
+    overflow: hidden;
+}
+
+.panel.collapsed .panel-content {
+    max-height: 0 !important;
+    opacity: 0;
+    padding: 0;
+}
+
+.panel.collapsed .panel-header {
+    border-bottom-color: transparent;
+}
+
 /* Decorative corner fold */
 .panel-header::after {
     content: '';

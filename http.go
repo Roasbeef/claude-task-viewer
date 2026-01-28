@@ -173,6 +173,14 @@ func templateFuncs() template.FuncMap {
 			}
 			return true
 		},
+		"shortPath": func(path string, n int) string {
+			// Return the last n path components with ellipsis prefix.
+			parts := strings.Split(path, "/")
+			if len(parts) <= n {
+				return path
+			}
+			return "…/" + strings.Join(parts[len(parts)-n:], "/")
+		},
 	}
 }
 

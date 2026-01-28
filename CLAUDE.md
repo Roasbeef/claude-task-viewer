@@ -24,6 +24,26 @@ Server runs at http://localhost:8080
 - **Data**: Reads from `~/.claude/projects/` and `~/.claude/tasks/`
 - **Logging**: btclog/v2 with `backend.SubSystem("TVWR")` pattern
 
+## UI Philosophy: HTMX First
+
+**HTMX is the baseline for all UI interactions.** Use server-rendered HTML partials with HTMX attributes for:
+
+- Navigation (`hx-boost="true"`)
+- Partial page updates (`hx-get`, `hx-swap`)
+- Live data polling (`hx-trigger="every 5s"`)
+- Out-of-band updates (`hx-swap-oob="true"`)
+- Infinite scroll (`hx-trigger="revealed"`)
+- Form submissions (`hx-post`)
+
+**Reference**: https://htmx.org/reference/ | https://htmx.org/docs/
+
+**Vanilla JavaScript** is acceptable for:
+- Client-side-only features (keyboard navigation, collapse/expand)
+- Complex visualizations (D3.js graphs)
+- Local state persistence (localStorage)
+
+**Avoid**: React, Vue, or heavy JS frameworks. Keep the JS footprint minimal.
+
 ## Key Files
 
 | File | Purpose |
