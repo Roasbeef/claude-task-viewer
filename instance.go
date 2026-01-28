@@ -58,9 +58,8 @@ func (it *InstanceTracker) ListRunningInstances() ([]ClaudeInstance, error) {
 
 // findClaudePIDs uses pgrep to find Claude Code process IDs.
 func (it *InstanceTracker) findClaudePIDs() ([]int, error) {
-	// Look for the main claude node process.
-	// Claude Code runs as a node process with "claude" in the command.
-	cmd := exec.Command("pgrep", "-f", "claude.*node")
+	// Look for processes named exactly "claude" (the CLI binary).
+	cmd := exec.Command("pgrep", "-x", "claude")
 	output, err := cmd.Output()
 	if err != nil {
 		// pgrep returns exit code 1 if no processes found.
@@ -88,13 +87,16 @@ func (it *InstanceTracker) findClaudePIDsFallback() ([]int, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(output))
 	for scanner.Scan() {
 		line := scanner.Text()
-		// Look for node processes running claude.
-		if strings.Contains(line, "node") &&
-			strings.Contains(line, "claude") &&
-			!strings.Contains(line, "grep") {
+		// Look for claude CLI processes. The command column typically shows
+		// just "claude" or "claude --flags".
+		fields := strings.Fields(line)
+		if len(fields) >= 11 {
+			// Command is typically in field 10+ (after USER PID %CPU etc).
+			cmdPart := strings.Join(fields[10:], " ")
+			if (strings.HasPrefix(cmdPart, "claude ") ||
+				cmdPart == "claude") &&
+				!strings.Contains(line, "grep") {
 
-			fields := strings.Fields(line)
-			if len(fields) >= 2 {
 				if pid, err := strconv.Atoi(fields[1]); err == nil {
 					pids = append(pids, pid)
 				}
